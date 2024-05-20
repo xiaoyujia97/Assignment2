@@ -74,7 +74,6 @@ def parse_relevance_file(path: str) -> dict[int, bool]:
 
 def process_ranking_results(model_results: dict, query: str,
                             model_name: str, output_folder="RankingOutputs"):
-
     # ensure output directory exists
     if output_folder not in os.listdir():
         os.mkdir(output_folder)
@@ -105,6 +104,10 @@ if __name__ == '__main__':
     # initialise the dictionary containing all document folders
     container = {}
 
+    average_precision_list = []
+    precision_at_10_list = []
+    discounted_cumulative_gain_list = []
+
     # iterate over folders
     for folder in get_subdirectories(folders_location):
         folder_path = os.path.join(folders_location, folder)
@@ -117,21 +120,67 @@ if __name__ == '__main__':
         if documents_folder.get_folder_number() == 101:
             print()
 
-
         documents_folder.bm25_ranking()
-
 
         process_ranking_results(documents_folder.bm25_ranking_result,
                                 documents_folder.get_folder_number(),
                                 "BM25")
-
-
 
         # TODO: call Jelinek-Mercer based Language Model
 
         # TODO: call personal ranking system
 
 
+
+
+
+
+
+        if documents_folder.get_folder_number() == 107:
+            print()
+
+        # calculate the results
+
+        # Call average precision
+        documents_folder.calculate_average_precision()
+        # call precision @10
+        documents_folder.calculate_precision_at_k()
+        # call discounted cumulative gain
+        documents_folder.calculate_discounted_cumulative_gain()
+
+        average_precision_list.append(documents_folder.folder_average_precision)
+        precision_at_10_list.append(documents_folder.folder_precision_at_k)
+        discounted_cumulative_gain_list.append(documents_folder.folder_discounted_cumulative_gain)
+
         container[documents_folder.get_folder_number()] = documents_folder
 
+    average_precision_df = pd.DataFrame(average_precision_list,
+                                        columns=["Topic", "BM25", "JM_LM", "My_PRM"]).sort_values(by="Topic")
+    average_precision_df.set_index('Topic', inplace=True)
+    mean_average_precision = average_precision_df.mean().to_list()
+    mean_row_df = pd.DataFrame([mean_average_precision], index=['MAP'],
+                               columns=average_precision_df.columns)
+    average_precision_df = pd.concat([average_precision_df, mean_row_df])
 
+
+    precision_at_10_df = pd.DataFrame(precision_at_10_list,
+                                        columns=["Topic", "BM25", "JM_LM", "My_PRM"]).sort_values(by="Topic")
+    precision_at_10_df.set_index('Topic', inplace=True)
+    average_precision_at_10 = precision_at_10_df.mean().to_list()
+    average_precision_at_10_df = pd.DataFrame([average_precision_at_10], index = ['Average'],
+                                              columns = precision_at_10_df.columns)
+    precision_at_10_df = pd.concat([precision_at_10_df, average_precision_at_10_df])
+
+
+    discounted_cumulative_gain_df = pd.DataFrame(discounted_cumulative_gain_list,
+                                        columns=["Topic", "BM25", "JM_LM", "My_PRM"]).sort_values(by="Topic")
+    discounted_cumulative_gain_df.set_index('Topic', inplace=True)
+    average_discounted = discounted_cumulative_gain_df.mean().to_list()
+    average_discounted_df = pd.DataFrame([average_discounted], index = ['Average'],
+                                        columns = discounted_cumulative_gain_df.columns)
+    discounted_cumulative_gain_df = pd.concat([discounted_cumulative_gain_df, average_discounted_df])
+
+
+    print(average_precision_df)
+    print(precision_at_10_df)
+    print(discounted_cumulative_gain_df)

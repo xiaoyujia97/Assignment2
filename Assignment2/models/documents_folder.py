@@ -23,7 +23,13 @@ class DocumentsFolder:
 
         self.corresponding_query = queries_dictionary[self.folder_number]
 
+
+        # ranking results
         self.bm25_ranking_result = {}
+
+        self.jm_ranking_result = {}
+
+        self.prm_ranking_result = {}
 
 
 
@@ -145,57 +151,139 @@ class DocumentsFolder:
 
 
     def calculate_average_precision(self):
+
+
         num_relevant_documents = sum(self.relevance_for_folder.values())
 
-        bm25_predicted_relevance = 0
-        jm_predicted_relevance = 0
-        prm_predicted_relevance = 0
-        for document_id, bm_25_rank in self.bm25_ranking_result.items():
+        bm25_running_relevant_docs = 0
+        current_iteration = 1
+        bm25_rolling_average_precision = 0
+        for document_id in self.bm25_ranking_result.keys():
 
             # check if above threshold for bm25
-            if bm_25_rank > 0 & self.relevance_for_folder[document_id]:
-                bm25_predicted_relevance += 1
+            if self.relevance_for_folder[document_id]:
+                bm25_running_relevant_docs += 1
+                bm25_current_precision = bm25_running_relevant_docs/current_iteration
+                bm25_rolling_average_precision += bm25_current_precision
 
-            # check if above threshold for jlm
-            # if bm_25_rank > 0 & self.relevance_for_folder[document_id]:
-            #     predicted_relevance += 1
+            current_iteration += 1
 
-        bm25_precision = bm25_predicted_relevance/num_relevant_documents
+
+
+        bm25_average_precision = bm25_rolling_average_precision / num_relevant_documents
+
+        jm_running_relevant_docs = 0
+        current_iteration = 1
+        jm_rolling_average_precision = 0
+        for document_id in self.jm_ranking_result.keys():
+
+            # check if above threshold for bm25
+            if self.relevance_for_folder[document_id]:
+                jm_running_relevant_docs += 1
+
+            jm_current_precision = jm_running_relevant_docs / current_iteration
+            current_iteration += 1
+
+            jm_rolling_average_precision += jm_current_precision
+
+        jm_average_precision = jm_rolling_average_precision / num_relevant_documents
+
+        prm_running_relevant_docs = 0
+        current_iteration = 1
+        prm_rolling_average_precision = 0
+        for document_id in self.jm_ranking_result.keys():
+
+            # check if above threshold for bm25
+            if self.relevance_for_folder[document_id]:
+                prm_running_relevant_docs += 1
+
+            prm_current_precision = prm_running_relevant_docs / current_iteration
+            current_iteration += 1
+
+            prm_rolling_average_precision += prm_current_precision
+
+        prm_average_precision = prm_rolling_average_precision / num_relevant_documents
 
         # create a tuple
-        self.average_precision = (bm25_precision)
+        self.folder_average_precision = (self.folder_number,
+                                         bm25_average_precision,
+                                         jm_average_precision,
+                                         prm_average_precision)
 
 
     def calculate_precision_at_k(self, k = 10):
 
-
         bm25_predicted_relevance = 0
         jm_predicted_relevance = 0
         prm_predicted_relevance = 0
-        for document_id, bm_25_rank in self.bm25_ranking_result.items()[:k]:
+
+        for document_id in list(self.bm25_ranking_result.keys())[:k]:
 
             # check if above threshold for bm25
-            if bm_25_rank > 0 & self.relevance_for_folder[document_id]:
+            if self.relevance_for_folder[document_id]:
                 bm25_predicted_relevance += 1
 
-        for document_id, jlm_rank in self.jm_lm_ranking().items()[:k]:
+        for document_id in list(self.jm_ranking_result.keys())[:k]:
 
             # check if above threshold for bm25
-            if jlm_rank > 0 & self.relevance_for_folder[document_id]:
+            if self.relevance_for_folder[document_id]:
                 jm_predicted_relevance += 1
+
+        for document_id in list(self.prm_ranking_result.keys())[:k]:
+
+            # check if above threshold for bm25
+            if self.relevance_for_folder[document_id]:
+                prm_predicted_relevance += 1
 
         bm25_precision_at_k = bm25_predicted_relevance / k
         jlm_precision_at_k = jm_predicted_relevance / k
+        prm_precision_at_k = prm_predicted_relevance / k
+
+        self.folder_precision_at_k = (self.folder_number,
+                                      bm25_precision_at_k,
+                                      jlm_precision_at_k,
+                                      prm_precision_at_k)
 
 
+    def calculate_discounted_cumulative_gain(self):
+        bm25_discounted_cumulative_gain = 0
+        jm_discounted_cumulative_gain = 0
+        prm_discounted_cumulative_gain = 0
 
-    # def calculate_discounted_cumulative_gain(self):
-    #     bm25_discounted_cumulative_gain = 0
-    #     jlm_discounted_cumulative_gain = 0
-    #     prm_discounted_cumulative_gain = 0
-    #
-    #     i = 1
-    #     for document_id, bm_25_rank in self.bm25_ranking_result.items()[:10]:
-    #         if self.relevance_for_folder[document_id]:
-    #
-    #         i += 1
+        i = 1
+        for document_id in list(self.bm25_ranking_result.keys())[:10]:
+            if self.relevance_for_folder[document_id]:
+                if i == 1:
+                    bm25_discounted_cumulative_gain += 1
+                else:
+                    bm25_discounted_cumulative_gain += 1/np.log(i)
+
+            # increment
+            i += 1
+
+        i = 1
+        for document_id in list(self.jm_ranking_result.keys())[:10]:
+            if self.relevance_for_folder[document_id]:
+                if i == 1:
+                    jm_discounted_cumulative_gain += 1
+                else:
+                    jm_discounted_cumulative_gain += 1 / np.log(i)
+
+            # increment
+            i += 1
+
+        i = 1
+        for document_id in list(self.prm_ranking_result.keys())[:10]:
+            if self.relevance_for_folder[document_id]:
+                if i == 1:
+                    prm_discounted_cumulative_gain += 1
+                else:
+                    prm_discounted_cumulative_gain += 1 / np.log(i)
+
+            # increment
+            i += 1
+
+        self.folder_discounted_cumulative_gain = (self.folder_number,
+                                                  bm25_discounted_cumulative_gain,
+                                                  jm_discounted_cumulative_gain,
+                                                  prm_discounted_cumulative_gain)
