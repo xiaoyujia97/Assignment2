@@ -1,6 +1,7 @@
 import os, re
 
 import pandas as pd
+from scipy.stats import ttest_rel
 
 from utils.helpers import get_subdirectories
 from models.documents_folder import DocumentsFolder
@@ -87,6 +88,31 @@ def process_ranking_results(model_results: dict, query: str,
     return None
 
 
+def compare_df_ttest(df: pd.DataFrame) -> None:
+
+    # remove the average
+    bm25_vals = df['BM25'][:-1].values
+    jm_vals = df['JM_LM'][:-1].values
+    prm_vals = df['My_PRM'][:-1].values
+
+    t_stats_1, p_val_1 = ttest_rel(bm25_vals, jm_vals)
+    print(f"BM25 vs JM_LM: t_statistic = {t_stats_1}, p_value = {p_val_1}")
+    if p_val_1 <= 0.05:
+        print("This is considered statistically significant")
+
+    t_stats_2, p_val_2 = ttest_rel(bm25_vals, prm_vals)
+    print(f"BM25 vs PRM: t_statistic = {t_stats_2}, p_value = {p_val_2}")
+    if p_val_2 <= 0.05:
+        print("This is considered statistically significant")
+
+    t_stats_3, p_val_3 = ttest_rel(jm_vals, prm_vals)
+    print(f"JM_LM vs PRM: t_statistic = {t_stats_3}, p_value = {p_val_3}")
+    if p_val_3 <= 0.05:
+        print("This is considered statistically significant")
+
+
+
+
 if __name__ == '__main__':
 
     queries_location = "../the50Queries.txt"
@@ -132,13 +158,6 @@ if __name__ == '__main__':
 
 
 
-
-
-
-
-        if documents_folder.get_folder_number() == 107:
-            print()
-
         # calculate the results
 
         # Call average precision
@@ -162,6 +181,10 @@ if __name__ == '__main__':
                                columns=average_precision_df.columns)
     average_precision_df = pd.concat([average_precision_df, mean_row_df])
 
+    print(average_precision_df)
+    print("Test stats of average precision: \n")
+    compare_df_ttest(average_precision_df)
+
 
     precision_at_10_df = pd.DataFrame(precision_at_10_list,
                                         columns=["Topic", "BM25", "JM_LM", "My_PRM"]).sort_values(by="Topic")
@@ -172,6 +195,10 @@ if __name__ == '__main__':
     precision_at_10_df = pd.concat([precision_at_10_df, average_precision_at_10_df])
 
 
+    print(precision_at_10_df)
+    print("Test stats of precision @ 10: \n")
+    compare_df_ttest(precision_at_10_df)
+
     discounted_cumulative_gain_df = pd.DataFrame(discounted_cumulative_gain_list,
                                         columns=["Topic", "BM25", "JM_LM", "My_PRM"]).sort_values(by="Topic")
     discounted_cumulative_gain_df.set_index('Topic', inplace=True)
@@ -180,7 +207,6 @@ if __name__ == '__main__':
                                         columns = discounted_cumulative_gain_df.columns)
     discounted_cumulative_gain_df = pd.concat([discounted_cumulative_gain_df, average_discounted_df])
 
-
-    print(average_precision_df)
-    print(precision_at_10_df)
     print(discounted_cumulative_gain_df)
+    print("Test stats of discounted cumulative gain: \n")
+    compare_df_ttest(discounted_cumulative_gain_df)
