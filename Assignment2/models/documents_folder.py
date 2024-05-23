@@ -125,15 +125,39 @@ class DocumentsFolder:
                 # calculate each term
                 term_1_num = (ri + 0.5)/(R - ri + 0.5)
                 term_1_denom = (ni - ri + 0.5)/(N - ni - R + ri + 0.5)
-                term_1 = term_1_num/term_1_denom
+
+                '''
+                We are seeking to make sure the fraction is greater than 1 in order to guarantee
+                a positive value after taking the log.
+                
+                We can do this by considering the smallest possible value the fraction can take
+                and then multiplying by a constant to ensure it is greater than 1.
+                
+                This is simply the lower bound of the numerator and upper bound of the denominator.
+                
+                The numerator lower bound is found when r_i is minimized (r_i=0). Therefore the
+                lower bound is 0.5/(R+0.5)
+                
+                The denominator upper bound is found when n_i is maximized but r_i is minimized.
+                Intuitively this is n_i = N and r_i = 0.  But n_i could not equal N when r_i is 0
+                as this would be contradictory as some relevant documents must have i appear.
+                Therefore n_i = N-R.  The upper bound is then (N-R+0.5)/0.5 = 2(N-R)+1.
+                
+                With these bounds we can guarantee a minimum value for term 1 of 1 by multiply by a constant
+                that is the inversion of these 2.
+                
+                Therefore the constant guaranteeing positivity is:
+                
+                2*(N-R+1)/(0.5/(R+0.5))
+                '''
+
+                term_1 = term_1_num/term_1_denom * 2*(N-R+1)/(0.5/(R+0.5))
 
                 term_2 = (K1 + 1) * fi / (K + fi)
 
                 term_3 = (K2 + 1) * query_frequency / (K2 + query_frequency)
 
                 weighting += np.log10(term_1) * term_2 * term_3
-
-                # print(query_term)
 
             document_weighting[document_id] = weighting
 
