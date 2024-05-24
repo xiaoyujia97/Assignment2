@@ -1,6 +1,7 @@
 import glob, os
 import numpy as np
 from models.document import Document
+from collections import defaultdict
 
 
 class DocumentsFolder:
@@ -171,8 +172,78 @@ class DocumentsFolder:
 
     def prm_ranking(self):
         # TODO: complete the personal ranking model
-        print()
+        # Pseudo-Feedback Algorithm
+        # declare the bm25 variables
+        K1 = 1.2
+        K2 = 500
+        B = 0.75
 
+        # Initialize the dictionary for document weights
+        document_weighting = {}
+
+        original_query = self.corresponding_query.parsed_query_text
+
+        # 1. Rank documents using the query likelihood score for query Q (BM25)
+        for document_id, document in self.documents.items():
+            # Initialize the weighting and the value of K
+            weighting = 0
+            K = K1 * ((1 - B) + B * document.get_document_length() / self.avg_document_length)
+            # R: number of relevant documents
+            R = sum(self.relevance_for_folder.values())
+            # N: number of documents in the folder
+            N = len(self.documents)
+
+            for query_term, query_frequency in original_query.items():
+                fi = document.terms.get(query_term, 0)
+                ri = self.relevant_document_frequencies.get(query_term, 0)
+                ni = self.document_frequencies.get(query_term, 0)
+
+                term_1_num = (ri + 0.5) / (R - ri + 0.5)
+                term_1_denom = (N - ni + 0.5) / (N - ni - R + ri + 0.5)
+                term_1 = term_1_num / term_1_denom if term_1_denom != 0 else 0
+
+                term_2 = (K1 + 1) * fi / (K + fi)
+                term_3 = (K2 + 1) * query_frequency / (K2 + query_frequency)
+
+                if term_1 * term_2 * term_3 > 0:
+                    weighting += np.log(term_1 * term_2 * term_3)
+
+            document_weighting[document_id] = weighting
+
+        # 2. Select some number of the top-ranked documents to be the set C (top 3 documents)
+        sorted_document_weighting = sorted(document_weighting.items(), key=lambda x: x[1], reverse=True)
+        top_k_documents = [doc_id for doc_id, _ in sorted_document_weighting[:3]]
+
+        # 3. Calculate the relevance model probabilities P(w|R) using the estimate for P(w,q1...qn)
+        term_relevance_probability = defaultdict(float)
+        total_terms_in_C = 0
+
+        for document_id in top_k_documents:
+            document = self.documents[document_id]
+            total_terms_in_C += sum(document.terms.values())
+            for term, freq in document.terms.items():
+                term_relevance_probability[term] += freq
+
+        for term in term_relevance_probability:
+            term_relevance_probability[term] /= total_terms_in_C
+
+        # 4. Rank documents again using the KL-divergence score: sum( P(w|R) log P(w|D) )
+        for document_id, document in self.documents.items():
+            kl_divergence = 0
+            for term, p_w_R in term_relevance_probability.items():
+                p_w_D = document.terms.get(term, 0) / document.get_document_length()
+                if p_w_D > 0:
+                    kl_divergence += p_w_R * np.log(p_w_R / p_w_D)
+                else:
+                    #divide by 0.01 to avoid case of divide by 0 or less
+                    kl_divergence += p_w_R * np.log(p_w_R / 0.0001)
+
+            document_weighting[document_id] = 0 - kl_divergence
+
+        self.prm_ranking_result = {k: v for k, v 
+                                    in sorted(document_weighting.items(),
+                                            key=lambda item: item[1], reverse=True)}
+        
 
     def calculate_average_precision(self):
 
@@ -215,7 +286,7 @@ class DocumentsFolder:
         prm_running_relevant_docs = 0
         current_iteration = 1
         prm_rolling_average_precision = 0
-        for document_id in self.jm_ranking_result.keys():
+        for document_id in self.prm_ranking_result.keys():
 
             # check if above threshold for bm25
             if self.relevance_for_folder[document_id]:
