@@ -143,10 +143,7 @@ if __name__ == '__main__':
                                            queries_dictionary,
                                            relevance)
 
-        if documents_folder.get_folder_number() == 101:
-            print()
-
-        documents_folder.bm25_ranking()
+        documents_folder.bm25_ranking_result = documents_folder.bm25_ranking()
 
         process_ranking_results(documents_folder.bm25_ranking_result,
                                 documents_folder.get_folder_number(),

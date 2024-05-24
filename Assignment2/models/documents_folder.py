@@ -75,13 +75,13 @@ class DocumentsFolder:
 
         return document_frequencies, relevant_document_frequencies
 
-    def bm25_ranking(self, using_relevance : bool = True):
-        # TODO: complete the BM25 ranking against the query
-
+    def bm25_ranking(self, using_relevance : bool = True,
+                     K1: float = 1.2, K2: float = 500.0,
+                     B: float = 0.75):
         # declare the variables
-        K1 = 1.2
-        K2 = 500
-        B = 0.75
+        # K1 = 1.2
+        # K2 = 500
+        # B = 0.75
 
 
         # initialise the dictionary
@@ -99,12 +99,10 @@ class DocumentsFolder:
 
             # for query_term, query_frequency in self.corresponding_query.parsed_query_text.items():
             for query_term, query_frequency in self.corresponding_query.parsed_long_query.items():
-
                 if query_term in document.terms:
                     fi = document.terms[query_term]
                 else:
                     fi = 0
-
                 # TODO:
                 """
                 Description of the BM25 ranking function
@@ -123,9 +121,16 @@ class DocumentsFolder:
                     ni = 0
 
 
-                # calculate each term
+                # calculate each term individually
                 term_1_num = (ri + 0.5)/(R - ri + 0.5)
                 term_1_denom = (ni - ri + 0.5)/(N - ni - R + ri + 0.5)
+
+                if using_relevance:
+                    term_1_num = (ri + 0.5) / (R - ri + 0.5)
+                    term_1_denom = (ni - ri + 0.5) / (N - ni - R + ri + 0.5)
+                else:
+                    term_1_num = 1
+                    term_1_denom = (ni - 0 + 0.5) / (N - ni - 0 + 0.5)
 
                 '''
                 We are seeking to make sure the fraction is greater than 1 in order to guarantee
@@ -150,9 +155,20 @@ class DocumentsFolder:
                 Therefore the constant guaranteeing positivity is:
                 
                 2*(N-R+1)/(0.5/(R+0.5))
+                
+                Alternatively if no relevance is used then we simply need to ensure the denominator is less
+                than 1 or that the numerator (1) is multiplied by a constant larger than the max value the
+                denominator can take.  The greatest value is when ni = N, therefore the upper bound is:
+                2N+1.  Therefore if we multiply the numerator by a constant 2N+1, the smallest value that 
+                term 1 can take is 1.
                 '''
 
-                term_1 = term_1_num/term_1_denom * 2*(N-R+1)/(0.5/(R+0.5))
+                if using_relevance:
+                    term_1 = term_1_num/term_1_denom * 2*(N-R+1)/(0.5/(R+0.5))
+                else:
+                    term_1 = term_1_num/term_1_denom * 2*(N+1)
+
+
 
                 term_2 = (K1 + 1) * fi / (K + fi)
 
@@ -162,57 +178,64 @@ class DocumentsFolder:
 
             document_weighting[document_id] = weighting
 
-        self.bm25_ranking_result = {k: v for k, v
+        ranked_results = {k: v for k, v
                                         in sorted(document_weighting.items(),
                                               key= lambda item: item[1], reverse = True)}
+
+        return ranked_results
+
+
 
     def jm_lm_ranking(self):
         # TODO: complete the Jelinek-Mercer based Language Model
         print()
 
-    def prm_ranking(self):
-        # TODO: complete the personal ranking model
+    def prm_ranking(self, K1: float = 1.2, K2: float = 500, B: float = 0.75, n_top_docs : int = 3):
+
         # Pseudo-Feedback Algorithm
-        # declare the bm25 variables
-        K1 = 1.2
-        K2 = 500
-        B = 0.75
 
-        # Initialize the dictionary for document weights
-        document_weighting = {}
-
+        # should this be used or should the long query be used??????
         original_query = self.corresponding_query.parsed_query_text
 
-        # 1. Rank documents using the query likelihood score for query Q (BM25)
-        for document_id, document in self.documents.items():
-            # Initialize the weighting and the value of K
-            weighting = 0
-            K = K1 * ((1 - B) + B * document.get_document_length() / self.avg_document_length)
-            # R: number of relevant documents
-            R = sum(self.relevance_for_folder.values())
-            # N: number of documents in the folder
-            N = len(self.documents)
 
-            for query_term, query_frequency in original_query.items():
-                fi = document.terms.get(query_term, 0)
-                ri = self.relevant_document_frequencies.get(query_term, 0)
-                ni = self.document_frequencies.get(query_term, 0)
+        # Initialize the dictionary for document weights
+        document_weighting = self.bm25_ranking(using_relevance=False, K1 = K1,
+                                               K2 = K2, B = B)
 
-                term_1_num = (ri + 0.5) / (R - ri + 0.5)
-                term_1_denom = (N - ni + 0.5) / (N - ni - R + ri + 0.5)
-                term_1 = term_1_num / term_1_denom if term_1_denom != 0 else 0
 
-                term_2 = (K1 + 1) * fi / (K + fi)
-                term_3 = (K2 + 1) * query_frequency / (K2 + query_frequency)
 
-                if term_1 * term_2 * term_3 > 0:
-                    weighting += np.log(term_1 * term_2 * term_3)
-
-            document_weighting[document_id] = weighting
+        # # 1. Rank documents using the query likelihood score for query Q (BM25)
+        # for document_id, document in self.documents.items():
+        #     # Initialize the weighting and the value of K
+        #     weighting = 0
+        #     K = K1 * ((1 - B) + B * document.get_document_length() / self.avg_document_length)
+        #     # R: number of relevant documents
+        #     R = sum(self.relevance_for_folder.values())
+        #     # N: number of documents in the folder
+        #     N = len(self.documents)
+        #
+        #     for query_term, query_frequency in original_query.items():
+        #         fi = document.terms.get(query_term, 0)
+        #         ri = self.relevant_document_frequencies.get(query_term, 0)
+        #         ni = self.document_frequencies.get(query_term, 0)
+        #
+        #         term_1_num = 1
+        #         term_1_denom = (N - ni + 0.5) / (N - ni - R + ri + 0.5)
+        #         term_1 = term_1_num / term_1_denom if term_1_denom != 0 else 0
+        #
+        #         term_2 = (K1 + 1) * fi / (K + fi)
+        #         term_3 = (K2 + 1) * query_frequency / (K2 + query_frequency)
+        #
+        #         if term_1 * term_2 * term_3 > 0:
+        #             weighting += np.log(term_1 * term_2 * term_3)
+        #
+        #     document_weighting[document_id] = weighting
 
         # 2. Select some number of the top-ranked documents to be the set C (top 3 documents)
+
+
         sorted_document_weighting = sorted(document_weighting.items(), key=lambda x: x[1], reverse=True)
-        top_k_documents = [doc_id for doc_id, _ in sorted_document_weighting[:3]]
+        top_k_documents = [doc_id for doc_id, _ in sorted_document_weighting[:n_top_docs]]
 
         # 3. Calculate the relevance model probabilities P(w|R) using the estimate for P(w,q1...qn)
         term_relevance_probability = defaultdict(float)
