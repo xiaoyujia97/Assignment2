@@ -155,7 +155,10 @@ if __name__ == '__main__':
         # TODO: call Jelinek-Mercer based Language Model
 
         # TODO: call personal ranking system
-
+        documents_folder.prm_ranking()
+        process_ranking_results(documents_folder.prm_ranking_result,
+                                documents_folder.get_folder_number(),
+                                "My_PRM")
 
 
         # calculate the results
