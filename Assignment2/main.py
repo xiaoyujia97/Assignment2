@@ -96,12 +96,12 @@ if __name__ == '__main__':
     # parse the queries text file
     queries_dictionary = parse_queries_document(queries_location)
 
-    relevance_location = "EvaluationBenchmark"
+    relevance_location = "../EvaluationBenchmark"
 
     relevance = parse_relevance_folder(relevance_location)
 
     # load the data collections
-    folders_location = "Data_Collection"
+    folders_location = "../Data_Collection"
 
     # initialise the dictionary containing all document folders
     container = {}
