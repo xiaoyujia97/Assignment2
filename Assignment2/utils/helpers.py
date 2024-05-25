@@ -1,6 +1,9 @@
 import os, string, re
 from stemming.porter2 import stem
 
+import pandas as pd
+from scipy.stats import ttest_rel
+
 # init a global stop word list
 with open("../common-english-words.txt") as file:
     STOP_WORDS = list(set(file.read().split(",")))
@@ -121,3 +124,32 @@ def parse_query(query: str) -> dict[str, int]:
 
     # return sorted dictionary
     return {k: v for k, v in sorted(term_frequency.items(), key=lambda item: item[1], reverse=True)}
+
+
+def create_summary_dataframe(data : list, average_index_name : str,
+                             column_names : list[str]) -> pd.DataFrame:
+
+    df = pd.DataFrame(data, columns=column_names).sort_values(by="Topic")
+    df.set_index('Topic', inplace=True)
+    mean_values = df.mean().to_list()
+    mean_row_df = pd.DataFrame([mean_values], index=[average_index_name], columns=df.columns)
+    summary_df = pd.concat([df, mean_row_df])
+    return summary_df
+
+
+def compare_df_ttest(df: pd.DataFrame) -> None:
+
+    columns = df.columns
+    results = []
+    for i in range(len(columns)):
+        for j in range(i + 1, len(columns)):
+            column1 = columns[i]
+            column2 = columns[j]
+            t_stat, p_val = ttest_rel(df[column1][:-1], df[column2][:-1])
+            results.append({
+                'Comparison': f'{column1} vs {column2}',
+                'T-Statistic': t_stat,
+                'P-Value': p_val
+            })
+
+            print(f"{column1} vs {column2}: t_statistic = {t_stat}, p_value = {p_val}")
