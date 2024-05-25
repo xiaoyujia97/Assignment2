@@ -224,7 +224,7 @@ class DocumentsFolder:
         self.jm_ranking_result = {k: v for k, v in
                                   sorted(document_weighting.items(), key=lambda item: item[1], reverse=True)}
 
-    def prm_ranking(self, K1: float = 1.2, K2: float = 500, B: float = 0.75, n_top_docs: int = 3):
+    def prm_ranking(self, K1: float = 1.2, K2: float = 500, B: float = 0.75, top_k_ratio: float = 0.1):
 
         # Pseudo-Feedback Algorithm
 
@@ -238,6 +238,13 @@ class DocumentsFolder:
         # 2. Select some number of the top-ranked documents to be the set C (top 3 documents)
 
         sorted_document_weighting = sorted(document_weighting.items(), key=lambda x: x[1], reverse=True)
+
+        #select top k of documents based on top_k_ratio
+        total_document = len(sorted_document_weighting)
+        n_top_docs = int(total_document * top_k_ratio)
+        if n_top_docs < 1:
+            n_top_docs = 1
+
         top_k_documents = [doc_id for doc_id, _ in sorted_document_weighting[:n_top_docs]]
 
         # 3. Calculate the relevance model probabilities P(w|R) using the estimate for P(w,q1...qn)
@@ -395,3 +402,4 @@ class DocumentsFolder:
                                                   bm25_discounted_cumulative_gain,
                                                   jm_discounted_cumulative_gain,
                                                   prm_discounted_cumulative_gain)
+        
