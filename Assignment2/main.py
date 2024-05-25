@@ -2,6 +2,7 @@ import os
 import re
 
 import pandas as pd
+from matplotlib import pyplot as plt
 
 from utils.helpers import get_subdirectories, create_summary_dataframe, compare_df_ttest
 from models.documents_folder import DocumentsFolder
@@ -95,12 +96,12 @@ if __name__ == '__main__':
     # parse the queries text file
     queries_dictionary = parse_queries_document(queries_location)
 
-    relevance_location = "../EvaluationBenchmark"
+    relevance_location = "EvaluationBenchmark"
 
     relevance = parse_relevance_folder(relevance_location)
 
     # load the data collections
-    folders_location = "../Data_Collection"
+    folders_location = "Data_Collection"
 
     # initialise the dictionary containing all document folders
     container = {}
@@ -125,6 +126,10 @@ if __name__ == '__main__':
                                 "BM25")
 
         # TODO: call Jelinek-Mercer based Language Model
+        documents_folder.jm_lm_ranking()
+        process_ranking_results(documents_folder.jm_ranking_result,
+                                documents_folder.get_folder_number(),
+                                "JM_LM")
 
         # call personal ranking system
         documents_folder.prm_ranking()
@@ -168,3 +173,25 @@ if __name__ == '__main__':
     print(discounted_cumulative_gain_df)
     print("Test stats of discounted cumulative gain: \n")
     compare_df_ttest(discounted_cumulative_gain_df)
+
+
+    def plot_line_chart(df, title):
+        plt.figure(figsize=(10, 6))
+        # Exclude the 'MAP' or 'Average' row
+        df_numeric = df.drop(['MAP', 'Average'], errors='ignore')
+        for column in df_numeric.columns:
+            plt.plot(df_numeric.index, df_numeric[column], label=column)
+
+        plt.title(title)
+        plt.xlabel('Collection')
+        plt.ylabel('Scores')
+        plt.legend()
+        plt.grid(True)
+        plt.xticks(rotation=90)
+        plt.show()
+
+
+    # Plots
+    plot_line_chart(average_precision_df, 'Average Precision')
+    plot_line_chart(precision_at_10_df, 'Precision @ 10')
+    plot_line_chart(discounted_cumulative_gain_df, 'Discounted Cumulative Gain')
