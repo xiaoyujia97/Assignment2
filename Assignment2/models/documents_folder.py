@@ -187,8 +187,50 @@ class DocumentsFolder:
 
 
     def jm_lm_ranking(self):
-        # TODO: complete the Jelinek-Mercer based Language Model
-        print()
+        alpha = 0.4  # Lambda
+
+        # Initialize dictionaries to store total terms and Cqi per collection
+        total_terms_per_collection = {}
+        Cqi_per_collection = {}
+
+        # Calculate C
+        for document in self.documents.values():
+            collection_id = os.path.basename(os.path.dirname(document.document_location))
+            if collection_id not in total_terms_per_collection:
+                total_terms_per_collection[collection_id] = 0
+                Cqi_per_collection[collection_id] = {query_term: 0 for query_term in
+                                                     self.corresponding_query.parsed_long_query}
+            total_terms_per_collection[collection_id] += document.get_document_length()
+
+            for term, freq in document.terms.items():
+                if term in Cqi_per_collection[collection_id]:
+                    Cqi_per_collection[collection_id][term] += freq
+
+        # Initialize dictionary to store the scores
+        document_weighting = {}
+
+        # Ranking calculation for each document
+        for document_id, document in self.documents.items():
+            document_score = 0
+            collection_id = os.path.basename(os.path.dirname(document.document_location))
+
+            # C and cqi
+            total_terms_in_collection = total_terms_per_collection[collection_id]
+            Cqi = Cqi_per_collection[collection_id]
+
+            for query_term in self.corresponding_query.parsed_long_query:
+                fqi = document.terms.get(query_term, 0)
+                term_frequency_in_collection = Cqi.get(query_term, 0)
+
+                # combining two parts
+                first_part = (1 - alpha) * (fqi / document.get_document_length())
+                second_part = alpha * (term_frequency_in_collection / total_terms_in_collection)
+                document_score += np.log10(first_part + second_part + 1)
+
+            document_weighting[document_id] = document_score
+
+        self.jm_ranking_result = {k: v for k, v in
+                                  sorted(document_weighting.items(), key=lambda item: item[1], reverse=True)}
 
     def prm_ranking(self, K1: float = 1.2, K2: float = 500, B: float = 0.75, n_top_docs : int = 3):
 
@@ -270,59 +312,49 @@ class DocumentsFolder:
 
     def calculate_average_precision(self):
 
-
+        # Total number of relevant documents in the folder
         num_relevant_documents = sum(self.relevance_for_folder.values())
 
+        # Calculate BM25 average precision
         bm25_running_relevant_docs = 0
         current_iteration = 1
         bm25_rolling_average_precision = 0
         for document_id in self.bm25_ranking_result.keys():
-
-            # check if above threshold for bm25
-            if self.relevance_for_folder[document_id]:
+            if self.relevance_for_folder[document_id]:  # Check if the document is relevant
                 bm25_running_relevant_docs += 1
-                bm25_current_precision = bm25_running_relevant_docs/current_iteration
+                bm25_current_precision = bm25_running_relevant_docs / current_iteration
                 bm25_rolling_average_precision += bm25_current_precision
-
             current_iteration += 1
-
-
 
         bm25_average_precision = bm25_rolling_average_precision / num_relevant_documents
 
+        # Calculate JM average precision
         jm_running_relevant_docs = 0
         current_iteration = 1
         jm_rolling_average_precision = 0
         for document_id in self.jm_ranking_result.keys():
-
-            # check if above threshold for bm25
-            if self.relevance_for_folder[document_id]:
+            if self.relevance_for_folder[document_id]:  # Check if the document is relevant
                 jm_running_relevant_docs += 1
-
-            jm_current_precision = jm_running_relevant_docs / current_iteration
+                jm_current_precision = jm_running_relevant_docs / current_iteration
+                jm_rolling_average_precision += jm_current_precision  # Accumulate the precision
             current_iteration += 1
-
-            jm_rolling_average_precision += jm_current_precision
 
         jm_average_precision = jm_rolling_average_precision / num_relevant_documents
 
+        # Calculate PRM average precision (note: this loop was using jm_ranking_result, which may be incorrect)
         prm_running_relevant_docs = 0
         current_iteration = 1
         prm_rolling_average_precision = 0
-        for document_id in self.prm_ranking_result.keys():
-
-            # check if above threshold for bm25
-            if self.relevance_for_folder[document_id]:
+        for document_id in self.prm_ranking_result.keys():  # Assuming it should be prm_ranking_result
+            if self.relevance_for_folder[document_id]:  # Check if the document is relevant
                 prm_running_relevant_docs += 1
-
-            prm_current_precision = prm_running_relevant_docs / current_iteration
+                prm_current_precision = prm_running_relevant_docs / current_iteration
+                prm_rolling_average_precision += prm_current_precision  # Accumulate the precision
             current_iteration += 1
-
-            prm_rolling_average_precision += prm_current_precision
 
         prm_average_precision = prm_rolling_average_precision / num_relevant_documents
 
-        # create a tuple
+        # Create a tuple
         self.folder_average_precision = (self.folder_number,
                                          bm25_average_precision,
                                          jm_average_precision,
