@@ -1,6 +1,7 @@
 import re
 from utils.helpers import parse_query
 
+
 class Query:
 
     def __init__(self, query_text: str):
@@ -31,5 +32,3 @@ class Query:
 
     def get_query_num(self):
         return self.query_num
-
-

@@ -1,4 +1,6 @@
-import os, string, re
+import os
+import string
+import re
 from stemming.porter2 import stem
 
 import pandas as pd
@@ -126,8 +128,8 @@ def parse_query(query: str) -> dict[str, int]:
     return {k: v for k, v in sorted(term_frequency.items(), key=lambda item: item[1], reverse=True)}
 
 
-def create_summary_dataframe(data : list, average_index_name : str,
-                             column_names : list[str]) -> pd.DataFrame:
+def create_summary_dataframe(data: list, average_index_name: str,
+                             column_names: list[str]) -> pd.DataFrame:
 
     df = pd.DataFrame(data, columns=column_names).sort_values(by="Topic")
     df.set_index('Topic', inplace=True)

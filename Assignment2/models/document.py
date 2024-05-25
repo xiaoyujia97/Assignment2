@@ -14,7 +14,6 @@ class Document:
 
         self.doc_len = len(self.document_text.split())
 
-
     def parse_document_information(self):
         # open the document
         with open(self.document_location) as file:

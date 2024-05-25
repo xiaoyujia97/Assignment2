@@ -1,11 +1,11 @@
-import os, re
+import os
+import re
 
 import pandas as pd
 
 from utils.helpers import get_subdirectories, create_summary_dataframe, compare_df_ttest
 from models.documents_folder import DocumentsFolder
 from models.query import Query
-
 
 
 def parse_queries_document(path: str) -> dict[int, Query]:
@@ -88,11 +88,6 @@ def process_ranking_results(model_results: dict, query: str,
     return None
 
 
-
-
-
-
-
 if __name__ == '__main__':
 
     queries_location = "../the50Queries.txt"
@@ -131,19 +126,19 @@ if __name__ == '__main__':
 
         # TODO: call Jelinek-Mercer based Language Model
 
-        # TODO: call personal ranking system
+        # call personal ranking system
         documents_folder.prm_ranking()
         process_ranking_results(documents_folder.prm_ranking_result,
                                 documents_folder.get_folder_number(),
                                 "My_PRM")
 
-
         # calculate the results
-
         # Call average precision
         documents_folder.calculate_average_precision()
+
         # call precision @10
         documents_folder.calculate_precision_at_k()
+
         # call discounted cumulative gain
         documents_folder.calculate_discounted_cumulative_gain()
 
@@ -156,24 +151,19 @@ if __name__ == '__main__':
     average_precision_df = create_summary_dataframe(average_precision_list, 'MAP',
                                                     ["Topic", "BM25", "JM_LM", "My_PRM"])
 
-
     print(average_precision_df)
     print("Test stats of average precision: \n")
     compare_df_ttest(average_precision_df)
 
-
     precision_at_10_df = create_summary_dataframe(precision_at_10_list, 'Average',
-                                                    ["Topic", "BM25", "JM_LM", "My_PRM"])
-
-
+                                                  ["Topic", "BM25", "JM_LM", "My_PRM"])
 
     print(precision_at_10_df)
     print("Test stats of precision @ 10: \n")
     compare_df_ttest(precision_at_10_df)
 
     discounted_cumulative_gain_df = create_summary_dataframe(discounted_cumulative_gain_list, 'Average',
-                                                  ["Topic", "BM25", "JM_LM", "My_PRM"])
-
+                                                             ["Topic", "BM25", "JM_LM", "My_PRM"])
 
     print(discounted_cumulative_gain_df)
     print("Test stats of discounted cumulative gain: \n")
