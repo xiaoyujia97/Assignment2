@@ -187,44 +187,71 @@ class DocumentsFolder:
 
 
     def jm_lm_ranking(self):
-        alpha = 0.4  # Lambda
+        """
+        P(Rx | D ) is the probability of document D relevant to long query Rx
+        We use the log-sum version of the formula to compute the scores instead of multiplication.
+        This helps avoid the issue of scores becoming very close to 0 when multiplying small probabilities.
 
-        # Initialize dictionaries to store total terms and Cqi per collection
-        total_terms_per_collection = {}
+
+        The formula consists of two parts that are combined using log summation:
+        The first part is (1 - λ) * fqi, D / |D|
+        - fqi, D is the frequency of term qi in document D
+        - ∣D∣ is the length of the document
+
+        The second part is λ * Cqi / |data_Cx
+        - Cqi is the frequency of term qi across the entire collection of documents
+        - |Data_Cx| is the total terms in a collection
+
+        The two parts are combined using log summation:
+        log10(first_part + second_part + 1)
+
+        The addition of 1 is done after summing the two parts to avoid a situation where a query term
+        is not present in a document or the collection, which would result in a zero probability.
+        Adding 1 avoids taking the log of 0.
+
+        λ = 0.4
+        """
+        # Lambda
+        alpha = 0.4
+
+        # initialise dictionaries to store total terms and Cqi per collection
+        collection_length = {}
         Cqi_per_collection = {}
 
         # Calculate C
         for document in self.documents.values():
             collection_id = os.path.basename(os.path.dirname(document.document_location))
-            if collection_id not in total_terms_per_collection:
-                total_terms_per_collection[collection_id] = 0
+            if collection_id not in collection_length:
+                collection_length[collection_id] = 0
                 Cqi_per_collection[collection_id] = {query_term: 0 for query_term in
                                                      self.corresponding_query.parsed_long_query}
-            total_terms_per_collection[collection_id] += document.get_document_length()
+            collection_length[collection_id] += document.get_document_length()
 
+            # calculate Cqi
             for term, freq in document.terms.items():
                 if term in Cqi_per_collection[collection_id]:
                     Cqi_per_collection[collection_id][term] += freq
 
-        # Initialize dictionary to store the scores
+        # initialise dictionary to store the scores
         document_weighting = {}
 
-        # Ranking calculation for each document
+        # score calculation for each document
         for document_id, document in self.documents.items():
             document_score = 0
             collection_id = os.path.basename(os.path.dirname(document.document_location))
 
             # C and cqi
-            total_terms_in_collection = total_terms_per_collection[collection_id]
+            C = collection_length[collection_id]
             Cqi = Cqi_per_collection[collection_id]
 
+            # calculate fqi
             for query_term in self.corresponding_query.parsed_long_query:
                 fqi = document.terms.get(query_term, 0)
                 term_frequency_in_collection = Cqi.get(query_term, 0)
 
-                # combining two parts
+                # combine the first part and the second part
                 first_part = (1 - alpha) * (fqi / document.get_document_length())
-                second_part = alpha * (term_frequency_in_collection / total_terms_in_collection)
+                second_part = alpha * (term_frequency_in_collection / C)
                 document_score += np.log10(first_part + second_part + 1)
 
             document_weighting[document_id] = document_score
