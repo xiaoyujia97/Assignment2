@@ -218,7 +218,7 @@ class DocumentsFolder:
         collection_length = {}
         Cqi_per_collection = {}
 
-        # Calculate C
+        # calculate C
         for document in self.documents.values():
             collection_id = os.path.basename(os.path.dirname(document.document_location))
             if collection_id not in collection_length:
