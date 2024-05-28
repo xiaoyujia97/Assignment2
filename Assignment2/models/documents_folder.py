@@ -190,7 +190,7 @@ class DocumentsFolder:
         """
         P(Rx | D ) is the probability of document D relevant to long query Rx
         We use the log-sum version of the formula to compute the scores instead of multiplication.
-        This helps avoid the issue of scores becoming very close to 0 when multiplying small probabilities.
+        This helps avoid the issue of scores becoming very close to 0 when multiplying small probabilities
 
 
         The formula consists of two parts that are combined using log summation:
@@ -206,8 +206,8 @@ class DocumentsFolder:
         log10(first_part + second_part + 1)
 
         The addition of 1 is done after summing the two parts to avoid a situation where a query term
-        is not present in a document or the collection, which would result in a zero probability.
-        Adding 1 avoids taking the log of 0.
+        is not present in a document or the collection, which would result in a zero probability
+        Adding 1 avoids taking the log of 0
 
         λ = 0.4
         """
