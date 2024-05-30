@@ -12,7 +12,9 @@ class Document:
 
         self.terms = parse_query(self.document_text)
 
-        self.doc_len = len(self.document_text.split())
+        # self.doc_len = len(self.document_text.split())
+
+        self.doc_len = sum([val for val in self.terms.values()])
 
     def parse_document_information(self):
         """
