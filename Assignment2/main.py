@@ -1,10 +1,8 @@
 import os
 import re
 
-import pandas as pd
-from matplotlib import pyplot as plt
-
-from utils.helpers import get_subdirectories, create_summary_dataframe, compare_df_ttest
+from utils.helpers import get_subdirectories, create_summary_dataframe, compare_df_ttest, \
+    process_ranking_results, print_ranking_results, plot_line_chart
 from models.documents_folder import DocumentsFolder
 from models.query import Query
 
@@ -42,6 +40,23 @@ def parse_queries_document(path: str) -> dict[int, Query]:
 
 
 def parse_relevance_folder(folder_loc: str) -> dict[int, dict[int, bool]]:
+    """
+    Function to parse each relevance documents
+
+    Parameters
+    ----------
+    folder_loc : str
+        The location of the relevance documents folder.
+
+    Returns
+    -------
+    dict[int, dict[int, bool]]
+        A dictionary with key representing the folder number and value being another dictionary
+        of RCV1 ID & boolean relevance.
+
+    """
+
+    # initialise the relevance dictionary
     relevance_for_each_folder = {}
 
     for file_name in os.listdir(folder_loc):
@@ -60,6 +75,22 @@ def parse_relevance_folder(folder_loc: str) -> dict[int, dict[int, bool]]:
 
 
 def parse_relevance_file(path: str) -> dict[int, bool]:
+    """
+    A function to convert a relevance text file into a dictionary
+
+    Parameters
+    ----------
+    path : str
+        The location of the relevance text file.
+
+    Returns
+    -------
+    dict[int, bool]
+        A dictionary of the relevance text file with key representing the RCV1 id
+        and boolean value for relevance
+    """
+
+    # initialise
     document_relevance_dict = {}
 
     with open(path, "r") as document_relevance_file:
@@ -74,30 +105,18 @@ def parse_relevance_file(path: str) -> dict[int, bool]:
     return document_relevance_dict
 
 
-def process_ranking_results(model_results: dict, query: str,
-                            model_name: str, output_folder="RankingOutputs"):
-    # ensure output directory exists
-    if output_folder not in os.listdir():
-        os.mkdir(output_folder)
-
-    df = pd.DataFrame(list(model_results.items()), columns=['DocumentID', 'Score'])
-    df['Score'] = df['Score'].apply(lambda x: f"{x:.15f}")
-
-    # Write to CSV
-    df.to_csv(os.path.join(output_folder, f"{model_name}_{query}Ranking.dat"), sep="\t", index=False, header=True)
-
-    return None
-
-
 if __name__ == '__main__':
 
+    # initialise the document locations
     queries_location = "../the50Queries.txt"
 
     # parse the queries text file
     queries_dictionary = parse_queries_document(queries_location)
 
+    # initialise the relevance locations
     relevance_location = "../EvaluationBenchmark"
 
+    # parse the relevances
     relevance = parse_relevance_folder(relevance_location)
 
     # load the data collections
@@ -106,6 +125,7 @@ if __name__ == '__main__':
     # initialise the dictionary containing all document folders
     container = {}
 
+    # initialise the list that the dataframes will be converted to.
     average_precision_list = []
     precision_at_10_list = []
     discounted_cumulative_gain_list = []
@@ -119,20 +139,20 @@ if __name__ == '__main__':
                                            queries_dictionary,
                                            relevance)
 
+        # call BM25
         documents_folder.bm25_ranking_result = documents_folder.bm25_ranking()
-
         process_ranking_results(documents_folder.bm25_ranking_result,
                                 documents_folder.get_folder_number(),
                                 "BM25")
 
-        # TODO: call Jelinek-Mercer based Language Model
+        # call Jelinek-Mercer based Language Model
         documents_folder.jm_lm_ranking()
         process_ranking_results(documents_folder.jm_ranking_result,
                                 documents_folder.get_folder_number(),
                                 "JM_LM")
 
         # call personal ranking system
-        documents_folder.prm_ranking()
+        documents_folder.prm_ranking(n_top_docs=3)
         process_ranking_results(documents_folder.prm_ranking_result,
                                 documents_folder.get_folder_number(),
                                 "My_PRM")
@@ -153,6 +173,9 @@ if __name__ == '__main__':
 
         container[documents_folder.get_folder_number()] = documents_folder
 
+    container = {k: v for k, v in sorted(container.items(), key=lambda x: x[0])}
+
+    # create the dataframes and summary statistics
     average_precision_df = create_summary_dataframe(average_precision_list, 'MAP',
                                                     ["Topic", "BM25", "JM_LM", "My_PRM"])
 
@@ -174,24 +197,16 @@ if __name__ == '__main__':
     print("Test stats of discounted cumulative gain: \n")
     compare_df_ttest(discounted_cumulative_gain_df)
 
-
-    def plot_line_chart(df, title):
-        plt.figure(figsize=(10, 6))
-        # Exclude the 'MAP' or 'Average' row
-        df_numeric = df.drop(['MAP', 'Average'], errors='ignore')
-        for column in df_numeric.columns:
-            plt.plot(df_numeric.index, df_numeric[column], label=column)
-
-        plt.title(title)
-        plt.xlabel('Collection')
-        plt.ylabel('Scores')
-        plt.legend()
-        plt.grid(True)
-        plt.xticks(rotation=90)
-        plt.show()
-
-
     # Plots
-    plot_line_chart(average_precision_df, 'Average Precision')
-    plot_line_chart(precision_at_10_df, 'Precision @ 10')
-    plot_line_chart(discounted_cumulative_gain_df, 'Discounted Cumulative Gain')
+    # plot_line_chart(average_precision_df, 'Average Precision')
+    # plot_line_chart(precision_at_10_df, 'Precision @ 10')
+    # plot_line_chart(discounted_cumulative_gain_df, 'Discounted Cumulative Gain')
+
+    print_ranking_results(container, 'bm25_ranking_result', './BM25_Appendix.txt', 'Appendix for BM25 Model')
+
+    print_ranking_results(container, 'jm_ranking_result', './JM_Appendix.txt', 'Appendix for JM Model')
+
+    print_ranking_results(container, 'prm_ranking_result', './PRM_Appendix.txt', 'Appendix for PRM Model')
+
+
+

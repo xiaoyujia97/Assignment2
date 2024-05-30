@@ -15,6 +15,22 @@ class Document:
         self.doc_len = len(self.document_text.split())
 
     def parse_document_information(self):
+        """
+        A function to convert an xml document into it's raw characteristics.
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        document_id: str
+            The document id as string.
+        title_content: str
+            The title of the document.
+        parsed_text_content: str
+            The text of the document with all xml tags removed.
+
+        """
         # open the document
         with open(self.document_location) as file:
             document_content = file.read()

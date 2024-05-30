@@ -14,6 +14,22 @@ class Query:
         self.parsed_long_query = parse_query(self.query_title + ' ' + self.query_desc + ' ' + self.query_narr)
 
     def parse_query_text(self):
+        """
+
+        Function to convert the raw query text to a tuple of query number, title,
+        description and narrative.
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        Tuple(int, str, str, str)
+            The tuple of each individual property
+
+        """
+
+
         query_number = re.search(r'<num> Number: R(.+)\n', self.query_text).group(1)
 
         query_title = re.search(r'<title>(.+)\n', self.query_text).group(1)

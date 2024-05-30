@@ -159,7 +159,7 @@ class DocumentsFolder:
                 '''
 
                 if using_relevance:
-                    term_1 = term_1_numerator / term_1_denominator * 2 * (N - R + 1) / (0.5 / (R + 0.5))
+                    term_1 = term_1_numerator / term_1_denominator * 2 * (N - R + 0.5) / (0.5 / (R + 0.5))
                 else:
                     term_1 = term_1_numerator / term_1_denominator * 2 * (N + 1)
 
@@ -235,10 +235,20 @@ class DocumentsFolder:
         document_weighting = self.bm25_ranking(using_relevance=False, K1=K1,
                                                K2=K2, B=B)
 
-        # 2. Select some number of the top-ranked documents to be the set C (top 3 documents)
-
+        # 2. Select some number of the top-ranked documents to be the set C (top n documents)
         sorted_document_weighting = sorted(document_weighting.items(), key=lambda x: x[1], reverse=True)
-        top_k_documents = [doc_id for doc_id, _ in sorted_document_weighting[:n_top_docs]]
+        # top_k_documents = [doc_id for doc_id, _ in sorted_document_weighting[:n_top_docs]]
+
+        dynamic_weight_threshold = sorted_document_weighting[0][1] * 0.9
+
+        percentile_90 = np.percentile([sorted_document_weighting[i][1] for i in range(len(sorted_document_weighting))],
+                                      95)
+
+        mean_weight = np.mean([sorted_document_weighting[i][1] for i in range(len(sorted_document_weighting))])
+        sd_weight = np.std([sorted_document_weighting[i][1] for i in range(len(sorted_document_weighting))])
+
+
+        top_k_documents = [doc_id for doc_id, weight in sorted_document_weighting if weight >= percentile_90]
 
         # 3. Calculate the relevance model probabilities P(w|R) using the estimate for P(w,q1...qn)
         term_relevance_probability = defaultdict(float)

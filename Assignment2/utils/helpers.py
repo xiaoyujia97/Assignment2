@@ -3,6 +3,7 @@ import string
 import re
 from stemming.porter2 import stem
 
+from matplotlib import pyplot as plt
 import pandas as pd
 from scipy.stats import ttest_rel
 
@@ -107,8 +108,8 @@ def parse_query(query: str) -> dict[str, int]:
         stem(word)
         for word in processed_query.split()
         if len(stem(word)) > 2
-        and word not in STOP_WORDS
-        and stem(word) not in STOP_WORDS
+           and word not in STOP_WORDS
+           and stem(word) not in STOP_WORDS
     ]
 
     # sort to ensure term_frequency dictionary is sorted already
@@ -130,7 +131,6 @@ def parse_query(query: str) -> dict[str, int]:
 
 def create_summary_dataframe(data: list, average_index_name: str,
                              column_names: list[str]) -> pd.DataFrame:
-
     df = pd.DataFrame(data, columns=column_names).sort_values(by="Topic")
     df.set_index('Topic', inplace=True)
     mean_values = df.mean().to_list()
@@ -140,7 +140,6 @@ def create_summary_dataframe(data: list, average_index_name: str,
 
 
 def compare_df_ttest(df: pd.DataFrame) -> None:
-
     columns = df.columns
     results = []
     for i in range(len(columns)):
@@ -155,3 +154,64 @@ def compare_df_ttest(df: pd.DataFrame) -> None:
             })
 
             print(f"{column1} vs {column2}: t_statistic = {t_stat}, p_value = {p_val}")
+
+
+def process_ranking_results(model_results: dict, query: str,
+                            model_name: str, output_folder="RankingOutputs"):
+    # ensure output directory exists
+    if output_folder not in os.listdir():
+        os.mkdir(output_folder)
+
+    df = pd.DataFrame(list(model_results.items()), columns=['DocumentID', 'Score'])
+    df['Score'] = df['Score'].apply(lambda x: f"{x:.15f}")
+
+    # Write to CSV
+    df.to_csv(os.path.join(output_folder, f"{model_name}_{query}Ranking.dat"), sep="\t", index=False, header=True)
+
+    return None
+
+def plot_line_chart(df, title):
+    plt.figure(figsize=(10, 6))
+    # Exclude the 'MAP' or 'Average' row
+    df_numeric = df.drop(['MAP', 'Average'], errors='ignore')
+    for column in df_numeric.columns:
+        plt.plot(df_numeric.index, df_numeric[column], label=column)
+
+    plt.title(title)
+    plt.xlabel('Collection')
+    plt.ylabel('Scores')
+    plt.legend()
+    plt.grid(True)
+    plt.xticks(rotation=90)
+    plt.show()
+
+
+def print_ranking_results(container: dict, result_type : str, text_file_loc: str, title: str):
+
+    with open(text_file_loc, 'a') as file:
+        # Write the title
+        file.write(title + '\n')
+
+        for folder_id, document_folder in container.items():
+
+            file.write(f"Query{folder_id} (DocID Weight):\n")
+
+
+            ranking_result = getattr(document_folder, result_type, None)
+
+            if ranking_result is None:
+                print(f"Error getting ranking results.  {result_type} is not an attribute of DocumentFolder class."
+                      f"Please try again with the correct attribute.")
+                break
+            else:
+                i = 0
+                for document_id, weight in document_folder.bm25_ranking_result.items():
+                    file.write(f"\t{document_id}: {weight}\n")
+
+                    i += 1
+
+                    if i == 15:
+                        break
+
+                file.write('\n')
+
