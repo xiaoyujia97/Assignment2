@@ -307,6 +307,97 @@ class DocumentsFolder:
                                    in sorted(document_weighting.items(),
                                              key=lambda item: item[1], reverse=True)}
 
+
+    def prm_ranking_2(self, K1: float = 1.2, K2: float = 500, B: float = 0.75, n_top_docs: int = 3):
+
+        # Initialize the dictionary for document weights
+        document_weighting = self.bm25_ranking(using_relevance=False, K1=K1,
+                                               K2=K2, B=B)
+
+        # 2. Select some number of the top-ranked documents to be the set C (top n documents)
+        sorted_document_weighting = sorted(document_weighting.items(), key=lambda x: x[1], reverse=True)
+        # top_k_documents = [doc_id for doc_id, _ in sorted_document_weighting[:n_top_docs]]
+
+        percentile_95 = np.percentile([sorted_document_weighting[i][1] for i in range(len(sorted_document_weighting))],
+                                      95)
+
+        # mean_weight = np.mean([sorted_document_weighting[i][1] for i in range(len(sorted_document_weighting))])
+        # sd_weight = np.std([sorted_document_weighting[i][1] for i in range(len(sorted_document_weighting))])
+
+        top_k_documents = [doc_id for doc_id, weight in sorted_document_weighting if weight >= percentile_95]
+
+
+        # extract the important features using TF*IDF
+        features = defaultdict(float)
+        total_relevant_documents = len(self.documents)
+
+        for doc_id in top_k_documents:
+            document = self.documents[doc_id]
+            doc_length = document.get_document_length()
+
+            for term, freq in document.terms.items():
+                tf_component = freq / doc_length
+                df = self.document_frequencies[term]
+                idf_component = np.log(total_relevant_documents/df) # no worry about div error as term has to exist
+                tf_idf = tf_component * idf_component
+                features[term] += tf_idf
+
+        sorted_feature_weighting = sorted(features.items(), key=lambda x: x[1], reverse=True)
+
+        # percentile_features = np.percentile([sorted_feature_weighting[i][1] for i in range(len(sorted_feature_weighting))],
+        #                               95)
+        mean_feature_weight = np.mean([sorted_feature_weighting[i][1] for i in range(len(sorted_feature_weighting))])
+        sd_feature_weight = np.std([sorted_feature_weighting[i][1] for i in range(len(sorted_feature_weighting))])
+
+        top_k_feature = [term for term, tf_idf_weight in sorted_feature_weighting if tf_idf_weight >= mean_feature_weight + sd_feature_weight]
+
+        print(top_k_feature)
+
+
+
+        # 3. Calculate the relevance model probabilities P(w|R) using the estimate for P(w,q1...qn)
+        term_relevance_probability = defaultdict(float)
+        total_terms_in_C = 0
+
+        for document_id in top_k_documents:
+            document = self.documents[document_id]
+            total_terms_in_C += sum(document.terms.values())
+            for term, freq in document.terms.items():
+                if term in top_k_feature:
+                    term_relevance_probability[term] += freq
+
+        for term in top_k_feature:
+            term_relevance_probability[term] /= total_terms_in_C
+
+        # 4. Rank documents again using the KL-divergence score: sum( P(w|R) log P(w|D) )
+        for document_id, document in self.documents.items():
+            kl_divergence = 0
+            for term, p_w_R in term_relevance_probability.items():
+                p_w_D = document.terms.get(term, 0) / document.get_document_length()
+                if p_w_D > 0:
+                    kl_divergence += p_w_R * np.log(p_w_R / p_w_D)
+                else:
+                    # divide by 0.01 to avoid case of divide by 0 or less
+                    kl_divergence += p_w_R * np.log(p_w_R / 0.0001)
+
+            document_weighting[document_id] = 0 - kl_divergence
+
+        self.prm_ranking_result = {k: v for k, v
+                                   in sorted(document_weighting.items(),
+                                             key=lambda item: item[1], reverse=True)}
+
+
+
+
+
+
+
+
+
+
+
+
+
     def calculate_average_precision(self):
 
         # Total number of relevant documents in the folder

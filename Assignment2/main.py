@@ -152,7 +152,7 @@ if __name__ == '__main__':
                                 "JM_LM")
 
         # call personal ranking system
-        documents_folder.prm_ranking(n_top_docs=3)
+        documents_folder.prm_ranking_2(n_top_docs=3)
         process_ranking_results(documents_folder.prm_ranking_result,
                                 documents_folder.get_folder_number(),
                                 "My_PRM")
@@ -198,9 +198,9 @@ if __name__ == '__main__':
     compare_df_ttest(discounted_cumulative_gain_df)
 
     # Plots
-    # plot_line_chart(average_precision_df, 'Average Precision')
-    # plot_line_chart(precision_at_10_df, 'Precision @ 10')
-    # plot_line_chart(discounted_cumulative_gain_df, 'Discounted Cumulative Gain')
+    plot_line_chart(average_precision_df, 'Average Precision')
+    plot_line_chart(precision_at_10_df, 'Precision @ 10')
+    plot_line_chart(discounted_cumulative_gain_df, 'Discounted Cumulative Gain')
 
     print_ranking_results(container, 'bm25_ranking_result', './BM25_Appendix.txt', 'Appendix for BM25 Model')
 
