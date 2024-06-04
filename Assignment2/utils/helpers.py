@@ -185,33 +185,161 @@ def plot_line_chart(df, title):
     plt.xticks(rotation=90)
     plt.show()
 
+def plot_bar_chart(df, title):
+    plt.figure(figsize=(10, 6))
+    # Exclude the 'MAP' or 'Average' row
+    df_numeric = df.drop(['MAP', 'Average'], errors='ignore')
+    for column in df_numeric.columns:
+        plt.bar(df_numeric.index, df_numeric[column], label=column)
 
-def print_ranking_results(container: dict, result_type : str, text_file_loc: str, title: str):
+    plt.title(title)
+    plt.xlabel('Collection')
+    plt.ylabel('Scores')
+    plt.legend()
+    plt.grid(True)
+    plt.xticks(rotation=90)
+    plt.show()
+
+
+def print_bm25_results(container: dict, result_type : str, text_file_loc: str, title: str):
+
+    documents = []
+
+    for folder_id, document_folder in container.items():
+        total_weight = 0
+
+        for document_id, weight in document_folder.bm25_ranking_result.items():
+            total_weight += weight
+        
+        documents.append([folder_id, weight])
+
+    sorted_documents = sorted(documents, key=lambda item: item[1], reverse=True)
+
+    top_15 = sorted_documents[:15]
+
 
     with open(text_file_loc, 'a') as file:
         # Write the title
         file.write(title + '\n')
 
-        for folder_id, document_folder in container.items():
+        for top_15_id,_ in top_15:
 
-            file.write(f"Query{folder_id} (DocID Weight):\n")
+            for folder_id, document_folder in container.items():
+
+                if folder_id == top_15_id:
+
+                    file.write(f"Query{folder_id} (DocID Weight):\n")
 
 
-            ranking_result = getattr(document_folder, result_type, None)
+                    ranking_result = getattr(document_folder, result_type, None)
 
-            if ranking_result is None:
-                print(f"Error getting ranking results.  {result_type} is not an attribute of DocumentFolder class."
-                      f"Please try again with the correct attribute.")
-                break
-            else:
-                i = 0
-                for document_id, weight in document_folder.bm25_ranking_result.items():
-                    file.write(f"\t{document_id}: {weight}\n")
-
-                    i += 1
-
-                    if i == 15:
+                    if ranking_result is None:
+                        print(f"Error getting ranking results.  {result_type} is not an attribute of DocumentFolder class."
+                            f"Please try again with the correct attribute.")
                         break
+                    else:
+                        i = 0
+                        for document_id, weight in document_folder.bm25_ranking_result.items():
+                            file.write(f"\t{document_id}: {weight}\n")
 
-                file.write('\n')
+                            i += 1
 
+                            if i == 15:
+                                break
+
+                        file.write('\n')
+
+def print_jm_results(container: dict, result_type : str, text_file_loc: str, title: str):
+
+    documents = []
+
+    for folder_id, document_folder in container.items():
+        total_weight = 0
+
+        for document_id, weight in document_folder.jm_ranking_result.items():
+            total_weight += weight
+        
+        documents.append([folder_id, weight])
+
+    sorted_documents = sorted(documents, key=lambda item: item[1], reverse=True)
+
+    top_15 = sorted_documents[:15]
+
+
+    with open(text_file_loc, 'a') as file:
+        # Write the title
+        file.write(title + '\n')
+
+        for top_15_id,_ in top_15:
+
+            for folder_id, document_folder in container.items():
+
+                if folder_id == top_15_id:
+
+                    file.write(f"Query{folder_id} (DocID Weight):\n")
+
+
+                    ranking_result = getattr(document_folder, result_type, None)
+
+                    if ranking_result is None:
+                        print(f"Error getting ranking results.  {result_type} is not an attribute of DocumentFolder class."
+                            f"Please try again with the correct attribute.")
+                        break
+                    else:
+                        i = 0
+                        for document_id, weight in document_folder.jm_ranking_result.items():
+                            file.write(f"\t{document_id}: {weight}\n")
+
+                            i += 1
+
+                            if i == 15:
+                                break
+
+                        file.write('\n')
+def print_prm_results(container: dict, result_type : str, text_file_loc: str, title: str):
+
+    documents = []
+
+    for folder_id, document_folder in container.items():
+        total_weight = 0
+
+        for document_id, weight in document_folder.prm_ranking_result.items():
+            total_weight += weight
+        
+        documents.append([folder_id, weight])
+
+    sorted_documents = sorted(documents, key=lambda item: item[1], reverse=True)
+
+    top_15 = sorted_documents[:15]
+
+
+    with open(text_file_loc, 'a') as file:
+        # Write the title
+        file.write(title + '\n')
+
+        for top_15_id,_ in top_15:
+
+            for folder_id, document_folder in container.items():
+
+                if folder_id == top_15_id:
+
+                    file.write(f"Query{folder_id} (DocID Weight):\n")
+
+
+                    ranking_result = getattr(document_folder, result_type, None)
+
+                    if ranking_result is None:
+                        print(f"Error getting ranking results.  {result_type} is not an attribute of DocumentFolder class."
+                            f"Please try again with the correct attribute.")
+                        break
+                    else:
+                        i = 0
+                        for document_id, weight in document_folder.prm_ranking_result.items():
+                            file.write(f"\t{document_id}: {weight}\n")
+
+                            i += 1
+
+                            if i == 15:
+                                break
+
+                        file.write('\n')
