@@ -11,6 +11,8 @@ class Query:
 
         self.parsed_query_text = parse_query(self.query_title)
 
+        self.parsed_query_description = parse_query(self.query_desc)
+
         self.parsed_long_query = parse_query(self.query_title + ' ' + self.query_desc + ' ' + self.query_narr)
 
     def parse_query_text(self):
