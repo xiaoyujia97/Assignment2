@@ -3,6 +3,9 @@ import os
 import numpy as np
 from models.document import Document
 from collections import defaultdict
+from scipy.optimize import minimize
+import heapq
+import math
 
 
 class DocumentsFolder:
@@ -73,9 +76,9 @@ class DocumentsFolder:
 
         return document_frequencies, relevant_document_frequencies
 
-    def bm25_ranking(self, using_relevance: bool = True,
+    def bm25_ranking(self, using_relevance: bool = False,
                      K1: float = 1.2, K2: float = 500.0,
-                     B: float = 0.75):
+                     B: float = 0.75, R=0, ri=0):
 
         # initialise the dictionary
         document_weighting = {}
@@ -86,7 +89,9 @@ class DocumentsFolder:
             weighting = 0
             K = K1 * ((1 - B) + B * document.get_document_length() / self.avg_document_length)
             # R is the number of relevant documents
-            R = sum(self.relevance_for_folder.values())
+            #TODO: benchmark should not be used in models
+            #R = sum(self.relevance_for_folder.values())
+            #R = 0
             # N is the number of documents in the folder
             N = len(self.documents)
 
@@ -107,13 +112,15 @@ class DocumentsFolder:
                     fi = document.terms[query_term]
                 else:
                     fi = 0
-
+                '''
                 # ri is the appearance of the term in relevant documents
                 if query_term in self.relevant_document_frequencies:
-                    ri = self.relevant_document_frequencies[query_term]
+                    #TODO: benchmark should not be used in models
+                    #ri = self.relevant_document_frequencies[query_term]
+                    ri = 0
                 else:
                     ri = 0
-
+                    '''
                 # ni is document frequency of the term
                 if query_term in self.document_frequencies:
                     ni = self.document_frequencies[query_term]
@@ -163,12 +170,19 @@ class DocumentsFolder:
                 else:
                     term_1 = term_1_numerator / term_1_denominator * 2 * (N + 1)
 
-                term_2 = (K1 + 1) * fi / (K + fi)
+                if (K + fi) != 0:
+                    term_2 = (K1 + 1) * fi / (K + fi)
+                else:
+                    term_2 = 0
 
-                term_3 = (K2 + 1) * query_frequency / (K2 + query_frequency)
+                if (K2 + query_frequency) != 0:
+                    term_3 = (K2 + 1) * query_frequency / (K2 + query_frequency)
+                else:
+                    term_3 = 0
 
                 # put it all together and add to the current weighting
-                weighting += np.log10(term_1) * term_2 * term_3
+                if term_1 > 0:
+                    weighting += np.log10(term_1) * term_2 * term_3
 
             document_weighting[document_id] = weighting
 
@@ -250,152 +264,128 @@ class DocumentsFolder:
 
         self.jm_ranking_result = {k: v for k, v in
                                   sorted(document_weighting.items(), key=lambda item: item[1], reverse=True)}
+        
+    def tfidf_ranking(self, using_relevance: bool = True):
 
-    def prm_ranking(self, K1: float = 1.2, K2: float = 500, B: float = 0.75, n_top_docs: int = 3):
+        document_weighting = {}
 
-        # Pseudo-Feedback Algorithm
+        N = len(self.documents)
 
-        # should this be used or should the long query be used??????
-        # original_query = self.corresponding_query.parsed_query_text
+        for document_id, document in self.documents.items():
+            weighting = 0
 
-        # Initialize the dictionary for document weights
-        document_weighting = self.bm25_ranking(using_relevance=False, K1=K1,
-                                               K2=K2, B=B)
+            for query_term, query_frequency in self.corresponding_query.parsed_long_query.items():
+                if query_term in document.terms:
+                    tf = document.terms[query_term] / document.get_document_length()
+                else:
+                    tf = 0
 
-        # 2. Select some number of the top-ranked documents to be the set C (top n documents)
+                df = self.document_frequencies.get(query_term, 0)
+
+                if df > 0:
+                    idf = np.log(N / df)
+                else:
+                    idf = 0
+
+                tf_idf = tf * idf
+
+                weighting += tf_idf
+
+            document_weighting[document_id] = weighting
+
+        ranked_results = {k: v for k, v in sorted(document_weighting.items(), key=lambda item: item[1], reverse=True)}
+
+        return ranked_results
+    
+    def prm_ranking(self, K1: float = 1.2, K2: float = 500, B: float = 0.85, top_k_ratio: float = 0.1):
+
+        '''
+        The PRM ranking starts by calling 'bm25_ranking' with initial fixed parameters 
+        too get an initial ranking of documents and sorted in descending order.
+
+        A subset of 'top_k_documents' is selected from the initial ranking based on 
+        pre-defined 'top_k_ratio' which is the top 10% of the sorted documents.
+
+        The term frequencies in 'top_k_documents' then calculated to estimate the 
+        'relevance_model_probability'.
+
+        A grid search is performed for BM25 parameters K1 and K2 to find the 
+        optimal combination that results the best BM25 score.
+        
+        Then the optimal K1 and K2 are used to perform the second BM25 ranking,
+        R and ri are also adjusted from the inital ranking assuming all documents relevant.
+
+        Rank the documents again using the KL-divergence score of the second BM25 ranking
+        between the relevance model probability P(w|R) and document probability P(w|D) for each document
+        '''
+        # initial BM25 Ranking
+        document_weighting = self.bm25_ranking(using_relevance=True, K1=K1, K2=K2, B=B)
         sorted_document_weighting = sorted(document_weighting.items(), key=lambda x: x[1], reverse=True)
-        # top_k_documents = [doc_id for doc_id, _ in sorted_document_weighting[:n_top_docs]]
 
-        dynamic_weight_threshold = sorted_document_weighting[0][1] * 0.9
+        # select top k of documents based on top_k_ratio
+        total_document = len(sorted_document_weighting)
+        n_top_docs = max(1, int(total_document * top_k_ratio))
 
-        percentile_90 = np.percentile([sorted_document_weighting[i][1] for i in range(len(sorted_document_weighting))],
-                                      95)
+        top_k_documents = [doc_id for doc_id, _ in sorted_document_weighting[:n_top_docs]]
 
-        mean_weight = np.mean([sorted_document_weighting[i][1] for i in range(len(sorted_document_weighting))])
-        sd_weight = np.std([sorted_document_weighting[i][1] for i in range(len(sorted_document_weighting))])
+        # calculate the relevance model probabilities using term frequencies in top_k_documents
+        relevance_model_probability = defaultdict(float)
+        collection_term_count = defaultdict(float)
+        total_terms_in_K = 0
 
-
-        top_k_documents = [doc_id for doc_id, weight in sorted_document_weighting if weight >= percentile_90]
-
-        # 3. Calculate the relevance model probabilities P(w|R) using the estimate for P(w,q1...qn)
-        term_relevance_probability = defaultdict(float)
-        total_terms_in_C = 0
+        total_collection_terms = 0
+        for doc_val in self.documents.values():
+            total_collection_terms += sum(doc_val.terms.values())
 
         for document_id in top_k_documents:
             document = self.documents[document_id]
-            total_terms_in_C += sum(document.terms.values())
+            total_terms_in_K += sum(document.terms.values())
             for term, freq in document.terms.items():
-                term_relevance_probability[term] += freq
+                relevance_model_probability[term] += freq
+                collection_term_count[term] += freq
 
-        for term in term_relevance_probability:
-            term_relevance_probability[term] /= total_terms_in_C
+        for term in relevance_model_probability:
+            relevance_model_probability[term] /= total_terms_in_K
 
-        # 4. Rank documents again using the KL-divergence score: sum( P(w|R) log P(w|D) )
+        # grid search for optimal BM25 parameters
+        k1_values = [1.0,1.1,1.2,1.3,1.4,1.5]
+        k2_values = [100,200,300,400,500]
+        local_best_k1 = 0
+        local_best_k2 = 0
+        local_best_score = -1
+
+        for k1 in k1_values:
+            for k2 in k2_values:
+                count = 0
+                total_score = 0
+                document_weighting = self.bm25_ranking(using_relevance=True, K1=K1, K2=K2, B=B, R=len(sorted_document_weighting), ri=total_collection_terms)
+                for _, score in document_weighting.items():
+                    total_score += score
+                    count += 1
+                average_score = total_score/count
+                if average_score > local_best_score:
+                    local_best_score = average_score
+                    local_best_k1 = k1
+                    local_best_k2 = k2
+
+        # second BM25 ranking using optimal parameters from grid search
+        document_weighting = self.bm25_ranking(using_relevance=True, K1=local_best_k1, K2=local_best_k2, B=B, R=len(sorted_document_weighting), ri=total_collection_terms)
+
+
+        # rank documents again using the KL-divergence score
         for document_id, document in self.documents.items():
             kl_divergence = 0
-            for term, p_w_R in term_relevance_probability.items():
-                p_w_D = document.terms.get(term, 0) / document.get_document_length()
-                if p_w_D > 0:
-                    kl_divergence += p_w_R * np.log(p_w_R / p_w_D)
-                else:
-                    # divide by 0.01 to avoid case of divide by 0 or less
-                    kl_divergence += p_w_R * np.log(p_w_R / 0.0001)
-
-            document_weighting[document_id] = 0 - kl_divergence
-
-        self.prm_ranking_result = {k: v for k, v
-                                   in sorted(document_weighting.items(),
-                                             key=lambda item: item[1], reverse=True)}
-
-
-    def prm_ranking_2(self, K1: float = 1.2, K2: float = 500, B: float = 0.75, n_top_docs: int = 3):
-
-        # Initialize the dictionary for document weights
-        document_weighting = self.bm25_ranking(using_relevance=False, K1=K1,
-                                               K2=K2, B=B)
-
-        # 2. Select some number of the top-ranked documents to be the set C (top n documents)
-        sorted_document_weighting = sorted(document_weighting.items(), key=lambda x: x[1], reverse=True)
-        # top_k_documents = [doc_id for doc_id, _ in sorted_document_weighting[:n_top_docs]]
-
-        percentile_95 = np.percentile([sorted_document_weighting[i][1] for i in range(len(sorted_document_weighting))],
-                                      95)
-
-        # mean_weight = np.mean([sorted_document_weighting[i][1] for i in range(len(sorted_document_weighting))])
-        # sd_weight = np.std([sorted_document_weighting[i][1] for i in range(len(sorted_document_weighting))])
-
-        top_k_documents = [doc_id for doc_id, weight in sorted_document_weighting if weight >= percentile_95]
-
-
-        # extract the important features using TF*IDF
-        features = defaultdict(float)
-        total_relevant_documents = len(self.documents)
-
-        for doc_id in top_k_documents:
-            document = self.documents[doc_id]
             doc_length = document.get_document_length()
+            for term, p_w_R in relevance_model_probability.items():
+                p_w_C = collection_term_count[term] / total_collection_terms
+                p_w_D = (document.terms.get(term, 0) + p_w_C) / doc_length
+                if p_w_D != 0:
+                    kl_divergence += (p_w_R * np.log(p_w_D)) - (p_w_R * np.log(p_w_R))
 
-            for term, freq in document.terms.items():
-                tf_component = freq / doc_length
-                df = self.document_frequencies[term]
-                idf_component = np.log(total_relevant_documents/df) # no worry about div error as term has to exist
-                tf_idf = tf_component * idf_component
-                features[term] += tf_idf
-
-        sorted_feature_weighting = sorted(features.items(), key=lambda x: x[1], reverse=True)
-
-        # percentile_features = np.percentile([sorted_feature_weighting[i][1] for i in range(len(sorted_feature_weighting))],
-        #                               95)
-        mean_feature_weight = np.mean([sorted_feature_weighting[i][1] for i in range(len(sorted_feature_weighting))])
-        sd_feature_weight = np.std([sorted_feature_weighting[i][1] for i in range(len(sorted_feature_weighting))])
-
-        top_k_feature = [term for term, tf_idf_weight in sorted_feature_weighting if tf_idf_weight >= mean_feature_weight + sd_feature_weight]
-
-        print(top_k_feature)
-
-
-
-        # 3. Calculate the relevance model probabilities P(w|R) using the estimate for P(w,q1...qn)
-        term_relevance_probability = defaultdict(float)
-        total_terms_in_C = 0
-
-        for document_id in top_k_documents:
-            document = self.documents[document_id]
-            total_terms_in_C += sum(document.terms.values())
-            for term, freq in document.terms.items():
-                if term in top_k_feature:
-                    term_relevance_probability[term] += freq
-
-        for term in top_k_feature:
-            term_relevance_probability[term] /= total_terms_in_C
-
-        # 4. Rank documents again using the KL-divergence score: sum( P(w|R) log P(w|D) )
-        for document_id, document in self.documents.items():
-            kl_divergence = 0
-            for term, p_w_R in term_relevance_probability.items():
-                p_w_D = document.terms.get(term, 0) / document.get_document_length()
-                if p_w_D > 0:
-                    kl_divergence += p_w_R * np.log(p_w_R / p_w_D)
-                else:
-                    # divide by 0.01 to avoid case of divide by 0 or less
-                    kl_divergence += p_w_R * np.log(p_w_R / 0.0001)
-
-            document_weighting[document_id] = 0 - kl_divergence
-
+            document_weighting[document_id] += kl_divergence
+        
         self.prm_ranking_result = {k: v for k, v
-                                   in sorted(document_weighting.items(),
-                                             key=lambda item: item[1], reverse=True)}
-
-
-
-
-
-
-
-
-
-
-
+                                   in sorted(document_weighting.items(), key=lambda item: item[1], reverse=True)}
 
 
     def calculate_average_precision(self):
@@ -447,6 +437,7 @@ class DocumentsFolder:
                                          bm25_average_precision,
                                          jm_average_precision,
                                          prm_average_precision)
+    
 
     def calculate_precision_at_k(self, k=10):
 
