@@ -170,7 +170,6 @@ def process_ranking_results(model_results: dict, query: str,
 
     return None
 
-
 def plot_line_chart(df, title):
     plt.figure(figsize=(10, 6))
     # Exclude the 'MAP' or 'Average' row
@@ -185,7 +184,6 @@ def plot_line_chart(df, title):
     plt.grid(True)
     plt.xticks(rotation=90)
     plt.show()
-
 
 def plot_bar_chart(df, title):
     plt.figure(figsize=(10, 6))
@@ -203,142 +201,93 @@ def plot_bar_chart(df, title):
     plt.show()
 
 
-def print_bm25_results(container: dict, result_type: str, text_file_loc: str, title: str):
-    documents = []
-
-    for folder_id, document_folder in container.items():
-        total_weight = 0
-
-        for document_id, weight in document_folder.bm25_ranking_result.items():
-            total_weight += weight
-
-        documents.append([folder_id, weight])
-
-    sorted_documents = sorted(documents, key=lambda item: item[1], reverse=True)
-
-    top_15 = sorted_documents[:15]
+def print_bm25_results(container: dict, result_type : str, text_file_loc: str, title: str):
 
     with open(text_file_loc, 'a') as file:
         # Write the title
         file.write(title + '\n')
 
-        for top_15_id, _ in top_15:
 
-            for folder_id, document_folder in container.items():
-
-                if folder_id == top_15_id:
-
-                    file.write(f"Query{folder_id} (DocID Weight):\n")
-
-                    ranking_result = getattr(document_folder, result_type, None)
-
-                    if ranking_result is None:
-                        print(
-                            f"Error getting ranking results.  {result_type} is not an attribute of DocumentFolder class."
-                            f"Please try again with the correct attribute.")
-                        break
-                    else:
-                        i = 0
-                        for document_id, weight in document_folder.bm25_ranking_result.items():
-                            file.write(f"\t{document_id}: {weight}\n")
-
-                            i += 1
-
-                            if i == 15:
-                                break
-
-                        file.write('\n')
+        for folder_id, document_folder in container.items():
 
 
-def print_jm_results(container: dict, result_type: str, text_file_loc: str, title: str):
-    documents = []
+                file.write(f"Query{folder_id} (DocID Weight):\n")
 
-    for folder_id, document_folder in container.items():
-        total_weight = 0
 
-        for document_id, weight in document_folder.jm_ranking_result.items():
-            total_weight += weight
+                ranking_result = getattr(document_folder, result_type, None)
 
-        documents.append([folder_id, weight])
+                if ranking_result is None:
+                    print(f"Error getting ranking results.  {result_type} is not an attribute of DocumentFolder class."
+                        f"Please try again with the correct attribute.")
+                    break
+                else:
+                    i = 0
+                    for document_id, weight in document_folder.bm25_ranking_result.items():
+                        file.write(f"\t{document_id}: {weight}\n")
 
-    sorted_documents = sorted(documents, key=lambda item: item[1], reverse=True)
+                        i += 1
 
-    top_15 = sorted_documents[:15]
+                        if i == 15:
+                            break
+
+                    file.write('\n')
+
+def print_jm_results(container: dict, result_type : str, text_file_loc: str, title: str):
 
     with open(text_file_loc, 'a') as file:
         # Write the title
         file.write(title + '\n')
 
-        for top_15_id, _ in top_15:
 
-            for folder_id, document_folder in container.items():
+        for folder_id, document_folder in container.items():
 
-                if folder_id == top_15_id:
-
-                    file.write(f"Query{folder_id} (DocID Weight):\n")
-
-                    ranking_result = getattr(document_folder, result_type, None)
-
-                    if ranking_result is None:
-                        print(
-                            f"Error getting ranking results.  {result_type} is not an attribute of DocumentFolder class."
-                            f"Please try again with the correct attribute.")
-                        break
-                    else:
-                        i = 0
-                        for document_id, weight in document_folder.jm_ranking_result.items():
-                            file.write(f"\t{document_id}: {weight}\n")
-
-                            i += 1
-
-                            if i == 15:
-                                break
-
-                        file.write('\n')
+                file.write(f"Query{folder_id} (DocID Weight):\n")
 
 
-def print_prm_results(container: dict, result_type: str, text_file_loc: str, title: str):
-    documents = []
+                ranking_result = getattr(document_folder, result_type, None)
 
-    for folder_id, document_folder in container.items():
-        total_weight = 0
+                if ranking_result is None:
+                    print(f"Error getting ranking results.  {result_type} is not an attribute of DocumentFolder class."
+                        f"Please try again with the correct attribute.")
+                    break
+                else:
+                    i = 0
+                    for document_id, weight in document_folder.jm_ranking_result.items():
+                        file.write(f"\t{document_id}: {weight}\n")
 
-        for document_id, weight in document_folder.prm_ranking_result.items():
-            total_weight += weight
+                        i += 1
 
-        documents.append([folder_id, weight])
+                        if i == 15:
+                            break
 
-    sorted_documents = sorted(documents, key=lambda item: item[1], reverse=True)
+                    file.write('\n')
 
-    top_15 = sorted_documents[:15]
+def print_prm_results(container: dict, result_type : str, text_file_loc: str, title: str):
 
     with open(text_file_loc, 'a') as file:
         # Write the title
         file.write(title + '\n')
 
-        for top_15_id, _ in top_15:
 
-            for folder_id, document_folder in container.items():
+        for folder_id, document_folder in container.items():
 
-                if folder_id == top_15_id:
+                file.write(f"Query{folder_id} (DocID Weight):\n")
 
-                    file.write(f"Query{folder_id} (DocID Weight):\n")
 
-                    ranking_result = getattr(document_folder, result_type, None)
+                ranking_result = getattr(document_folder, result_type, None)
 
-                    if ranking_result is None:
-                        print(
-                            f"Error getting ranking results.  {result_type} is not an attribute of DocumentFolder class."
-                            f"Please try again with the correct attribute.")
-                        break
-                    else:
-                        i = 0
-                        for document_id, weight in document_folder.prm_ranking_result.items():
-                            file.write(f"\t{document_id}: {weight}\n")
+                if ranking_result is None:
+                    print(f"Error getting ranking results.  {result_type} is not an attribute of DocumentFolder class."
+                        f"Please try again with the correct attribute.")
+                    break
+                else:
+                    i = 0
+                    for document_id, weight in document_folder.prm_ranking_result.items():
+                        file.write(f"\t{document_id}: {weight}\n")
 
-                            i += 1
+                        i += 1
 
-                            if i == 15:
-                                break
+                        if i == 15:
+                            break
 
-                        file.write('\n')
+                    file.write('\n')
