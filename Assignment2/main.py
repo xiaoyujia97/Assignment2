@@ -2,7 +2,7 @@ import os
 import re
 
 from utils.helpers import get_subdirectories, create_summary_dataframe, compare_df_ttest, \
-    process_ranking_results, print_ranking_results, plot_line_chart
+    process_ranking_results, plot_line_chart, plot_bar_chart, print_bm25_results, print_jm_results, print_prm_results
 from models.documents_folder import DocumentsFolder
 from models.query import Query
 
@@ -152,7 +152,7 @@ if __name__ == '__main__':
                                 "JM_LM")
 
         # call personal ranking system
-        documents_folder.prm_ranking_2(n_top_docs=3)
+        documents_folder.prm_ranking()
         process_ranking_results(documents_folder.prm_ranking_result,
                                 documents_folder.get_folder_number(),
                                 "My_PRM")
@@ -198,15 +198,14 @@ if __name__ == '__main__':
     compare_df_ttest(discounted_cumulative_gain_df)
 
     # Plots
-    plot_line_chart(average_precision_df, 'Average Precision')
-    plot_line_chart(precision_at_10_df, 'Precision @ 10')
-    plot_line_chart(discounted_cumulative_gain_df, 'Discounted Cumulative Gain')
+    plot_bar_chart(average_precision_df, 'Average Precision')
+    plot_bar_chart(precision_at_10_df, 'Precision @ 10')
+    plot_bar_chart(discounted_cumulative_gain_df, 'Discounted Cumulative Gain')
 
-    print_ranking_results(container, 'bm25_ranking_result', './BM25_Appendix.txt', 'Appendix for BM25 Model')
+    print_bm25_results(container, 'bm25_ranking_result', './BM25_Appendix.txt', 'Appendix for BM25 Model')
 
-    print_ranking_results(container, 'jm_ranking_result', './JM_Appendix.txt', 'Appendix for JM Model')
+    print_jm_results(container, 'jm_ranking_result', './JM_Appendix.txt', 'Appendix for JM Model')
 
-    print_ranking_results(container, 'prm_ranking_result', './PRM_Appendix.txt', 'Appendix for PRM Model')
-
+    print_prm_results(container, 'prm_ranking_result', './PRM_Appendix.txt', 'Appendix for PRM Model')
 
 
